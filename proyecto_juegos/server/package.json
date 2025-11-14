@@ -1,0 +1,12 @@
+{
+  "name": "naturalciencia-ws-server",
+  "version": "1.0.0",
+  "description": "WebSocket pairing server for NaturalCiencia cannon game",
+  "main": "ws-server.js",
+  "scripts": {
+    "start": "node ws-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  }
+}

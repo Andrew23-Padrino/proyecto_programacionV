@@ -1,0 +1,637 @@
+import { firebaseServices_ap } from './firebase-services.js';
+
+// Lesson / quiz controller: shows a brief lesson and small quiz before the game
+class CannonLesson {
+  constructor(onComplete){
+    this.onComplete = onComplete;
+    this.overlay = document.getElementById('lesson-overlay');
+    this.slides = Array.from(document.querySelectorAll('.lesson-slide'));
+    this.idx = 0;
+    this.prevBtn = document.getElementById('lesson-prev');
+    this.nextBtn = document.getElementById('lesson-next');
+    this.skipBtn = document.getElementById('lesson-skip');
+    this.startGameBtn = document.getElementById('lesson-start-game');
+    this.startBotBtn = document.getElementById('lesson-start-bot');
+    this.feedback = document.getElementById('lesson-feedback');
+    this.quizForm = document.getElementById('lesson-quiz');
+    this.bind();
+    this.showSlide(0);
+  }
+
+  bind(){
+    if (!this.overlay) { if (this.onComplete) this.onComplete(); return; }
+    if (this.prevBtn) this.prevBtn.addEventListener('click', ()=> this.showSlide(this.idx-1));
+    if (this.nextBtn) this.nextBtn.addEventListener('click', ()=> this.showSlide(this.idx+1));
+    if (this.skipBtn) this.skipBtn.addEventListener('click', ()=> this.finish({ skipped:true }));
+    if (this.startGameBtn) this.startGameBtn.addEventListener('click', ()=> this.startRequested(false));
+    if (this.startBotBtn) this.startBotBtn.addEventListener('click', ()=> this.startRequested(true));
+  }
+
+  showSlide(i){
+    if (i < 0) i = 0; if (i >= this.slides.length) i = this.slides.length-1;
+    this.slides.forEach((s,idx)=> s.classList.toggle('hidden', idx !== i));
+    this.idx = i;
+    // update nav buttons
+    if (this.prevBtn) this.prevBtn.disabled = (i === 0);
+    if (this.nextBtn) this.nextBtn.disabled = (i === this.slides.length-1);
+  }
+
+  startRequested(vsBot){
+    // If on final slide, validate quiz quickly (optional) then finish
+    try{
+      const q1 = this.quizForm.querySelector('input[name="q1"]:checked');
+      const q2 = this.quizForm.querySelector('input[name="q2"]:checked');
+      let score = 0; if (q1 && q1.value === '45') score += 1; if (q2 && q2.value === 'quad') score += 1;
+      // provide brief feedback then finish
+      if (this.feedback) this.feedback.textContent = `Puntuación: ${score}/2`;
+      setTimeout(()=> this.finish({ skipped:false, score, vsBot }), 600);
+    }catch(e){ console.error('startRequested error', e); this.finish({ vsBot }); }
+  }
+
+  finish(result){
+    if (this.overlay) this.overlay.style.display = 'none';
+    if (this.onComplete) this.onComplete(result || {});
+  }
+}
+
+// POO: registra intentos de disparo durante una partida
+class MatchRecorder {
+  constructor(){ this.attempts = []; }
+  recordAttempt(attempt){
+    // normalize attempt object and add timestamp
+    const a = Object.assign({}, attempt);
+    a.timestamp = new Date();
+    this.attempts.push(a);
+  }
+  getAttempts(){ return this.attempts.slice(); }
+}
+
+class CannonGame {
+  constructor(canvasId, options = {}){
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.angleEl = document.getElementById('angle');
+    this.powerEl = document.getElementById('power');
+    this.angleVal = document.getElementById('angleVal');
+    this.powerVal = document.getElementById('powerVal');
+    this.hintBtn = document.getElementById('hint');
+    this.autoAngleBtn = document.getElementById('auto-angle');
+    this.hintOutput = document.getElementById('hint-output');
+    this.hintSuggestions = document.getElementById('hint-suggestions');
+    this.manualDistanceEl = document.getElementById('manual-distance');
+    this.setDistanceBtn = document.getElementById('set-distance');
+    this.clearDistanceBtn = document.getElementById('clear-distance');
+    this.simulateShotBtn = document.getElementById('simulate-shot');
+    this.launchBtn = document.getElementById('launch');
+    this.resetBtn = document.getElementById('reset');
+    this.resultEl = document.getElementById('result');
+    this.wsStatus = document.getElementById('ws-status');
+    this.ws = null;
+    this.playerId = null;
+    this.myTurn = false;
+    this.options = options || {};
+    this.botMode = !!this.options.vsBot;
+    this.lessonScore = Number(this.options.lessonScore || 0);
+    this.botActive = false;
+    this.finished = false; // indicates match has ended
+    this.recorder = new MatchRecorder();
+    this.init();
+  }
+
+  init(){
+    try{
+      console.log('CannonGame: init() starting');
+    }catch(e){}
+    this.canvas.width = this.canvas.clientWidth * devicePixelRatio;
+    this.canvas.height = this.canvas.clientHeight * devicePixelRatio;
+    this.ctx.scale(devicePixelRatio, devicePixelRatio);
+    // defensive checks: create minimal UI feedback if missing
+    if (!this.hintOutput) {
+      try{
+        const container = document.createElement('div');
+        container.id = 'hint-output';
+        container.className = 'mt-3 text-sm text-gray-700';
+        const parent = document.querySelector('#distance')?.parentElement || document.body;
+        parent.appendChild(container);
+        this.hintOutput = container;
+        console.warn('CannonGame: hint-output was missing; created fallback container.');
+      }catch(e){ console.error('CannonGame: could not create hint-output fallback', e); }
+    }
+    this.angleEl.addEventListener('input', ()=> this.angleVal.textContent = this.angleEl.value);
+    this.powerEl.addEventListener('input', ()=> this.powerVal.textContent = this.powerEl.value);
+    this.launchBtn.addEventListener('click', ()=> this.onLaunch());
+    this.resetBtn.addEventListener('click', ()=> this.reset());
+    if (this.hintBtn) this.hintBtn.addEventListener('click', ()=> this.onHint());
+    if (this.autoAngleBtn) this.autoAngleBtn.addEventListener('click', ()=> this.onAutoAngle());
+    if (this.setDistanceBtn) this.setDistanceBtn.addEventListener('click', ()=> {
+      const v = Number(this.manualDistanceEl.value);
+      if (v && v > 0) {
+        this.distance = v;
+        if (this.distanceEl) this.distanceEl.textContent = v;
+        this.drawBattlefield();
+        if (this.hintOutput) this.hintOutput.textContent = 'Distancia manual establecida.';
+      } else {
+        if (this.hintOutput) this.hintOutput.textContent = 'Introduce una distancia válida (>0).';
+      }
+    });
+    if (this.clearDistanceBtn) this.clearDistanceBtn.addEventListener('click', ()=> {
+      this.distance = 0;
+      if (this.distanceEl) this.distanceEl.textContent = '—';
+      this.drawBattlefield();
+      if (this.hintOutput) this.hintOutput.textContent = 'Distancia manual borrada.';
+    });
+    if (this.simulateShotBtn) this.simulateShotBtn.addEventListener('click', ()=>{
+      // simulate an opponent shot using current UI values but from the opposite side
+      try{
+        const angle = Number(this.angleEl.value) || 45;
+        const power = Number(this.powerEl.value) || 40;
+        const opponentFrom = (this.playerId === 1) ? 2 : 1;
+        // Use a distinct shooterUid so match-saving logic doesn't confuse same-account tests
+        const shooterUid = (firebaseServices_ap.auth.currentUser ? firebaseServices_ap.auth.currentUser.uid : 'LOCAL') + '-sim';
+        this.drawShot(angle, power, '#1c7ed6', opponentFrom, shooterUid);
+      }catch(e){ console.error('simulateShot error', e); }
+    });
+    this.connectWS();
+    // If botMode was requested explicitly, enable immediately
+    if (this.botMode) this.enableBot();
+    this.distance = 0;
+    this.failedAttempts = 0; // number of failed launches by the local player in this match
+    this.distanceEl = document.getElementById('distance');
+    this.padding = 40; // padding (px) from canvas edges for world-to-canvas mapping
+    this.scale = 1;
+    this.reset();
+  }
+
+  connectWS(){
+    const url = (location.protocol === 'https:' ? 'wss' : 'ws') + '://'+(location.hostname || 'localhost')+':8080';
+    this.ws = new WebSocket(url);
+    this.ws.addEventListener('open', ()=>{ this.wsStatus.textContent = 'Conectado'; this.wsStatus.className='text-green-600'; });
+    this.ws.addEventListener('close', ()=>{ this.wsStatus.textContent = 'Desconectado'; this.wsStatus.className='text-red-600'; });
+    this.ws.addEventListener('message', (ev)=> this.onMessage(ev));
+    // after opening, identify with Firebase uid if available
+    this.ws.addEventListener('open', ()=>{
+      const uid = firebaseServices_ap.auth.currentUser ? firebaseServices_ap.auth.currentUser.uid : null;
+      try{ this.ws.send(JSON.stringify({ type: 'identify', uid })); }catch(e){}
+    });
+    // If server doesn't assign an opponent within timeout and botMode is true, enable bot
+    setTimeout(()=>{
+      if (this.botMode && !this.opponentUid) {
+        this.enableBot();
+      }
+    }, 2500);
+  }
+
+  onMessage(ev){
+    let msg;
+    try{ msg = JSON.parse(ev.data);}catch(e){return}
+    if(msg.type === 'assign'){
+      this.playerId = msg.player;
+      this.wsStatus.textContent = `Conectado (jugador ${this.playerId})`;
+    } else if(msg.type === 'start'){
+      this.distance = msg.distance || this.distance;
+      this.opponentUid = msg.opponentUid || null;
+      if(this.distanceEl) this.distanceEl.textContent = this.distance;
+      this.myTurn = msg.turn === this.playerId;
+      // redraw battlefield with new distance
+      this.reset();
+      this.updateTurnUI();
+    } else if(msg.type === 'shot'){
+      // shot received (server adds `from` and may forward `uid`)
+      const from = msg.from || 2;
+      const shooterUid = msg.uid || null;
+      const color = from === this.playerId ? '#ff4d4d' : '#1c7ed6';
+      // draw shot originating from `from`, pass shooterUid so receiver can record match
+      this.drawShot(msg.angle, msg.power, color, from, shooterUid);
+      // after opponent shoots, it's my turn
+      if(msg.from && msg.from !== this.playerId){ this.myTurn = true; this.updateTurnUI(); }
+      // if bot is active, schedule its turn (no-op when playing vs human)
+      if (this.botActive) this.scheduleBotTurn();
+    }
+  }
+
+  updateTurnUI(){
+    if (this.finished) { this.launchBtn.setAttribute('disabled',''); this.launchBtn.textContent = 'Partida finalizada'; return; }
+    if(this.myTurn){ this.launchBtn.removeAttribute('disabled'); this.launchBtn.textContent = 'Tu turno: Disparar'; }
+    else { this.launchBtn.setAttribute('disabled',''); this.launchBtn.textContent = 'Esperando oponente'; }
+  }
+
+  enableBot(){
+    if (this.botActive) return;
+    this.botActive = true;
+    this.opponentUid = 'BOT';
+    // if no playerId assigned, assume local is player 1
+    if (!this.playerId) this.playerId = 1;
+    // decide initial turn: if playerId===1 let player start
+    this.myTurn = (this.playerId === 1);
+    this.updateTurnUI();
+    if (this.hintOutput) this.hintOutput.textContent = 'Modo Bot activado — jugando contra IA local.';
+  }
+
+  scheduleBotTurn(){
+    if (!this.botActive) return;
+    if (this.finished) return;
+    // bot acts when it's not my turn
+    if (this.myTurn) return;
+    setTimeout(()=>{
+      try{
+        const R = Number(this.distance) || 200;
+        // choose angle randomly around 40-60
+        const angle = 30 + Math.random()*40;
+        let power = this.computeRequiredPower(angle, R);
+        if (!power) power = 40;
+        power = Math.round(power * (0.9 + Math.random()*0.3)); // add noise
+        // opponentFrom is opposite of my playerId
+        const from = (this.playerId === 1) ? 2 : 1;
+        this.drawShot(angle, power, '#1c7ed6', from, 'BOT');
+        // after bot shoots, set myTurn true
+        this.myTurn = true; this.updateTurnUI();
+      }catch(e){ console.error('Bot error', e); }
+    }, 800 + Math.random()*800);
+  }
+
+  onLaunch(){
+    if (this.finished) return;
+    if(!this.myTurn) return;
+    const angle = Number(this.angleEl.value);
+    const power = Number(this.powerEl.value);
+    // draw local shot in red (origin depends on player) and include our uid in the message
+    const uid = firebaseServices_ap.auth.currentUser ? firebaseServices_ap.auth.currentUser.uid : null;
+    this.drawShot(angle, power, '#ff4d4d', this.playerId || 1, uid);
+    // send to server
+    if(this.ws && this.ws.readyState === WebSocket.OPEN){
+      this.ws.send(JSON.stringify({type:'shot', angle, power, uid}));
+    }
+    // after shooting, disable until opponent shoots
+    this.myTurn = false;
+    this.updateTurnUI();
+    // if playing vs bot, schedule bot response
+    if (this.botActive) this.scheduleBotTurn();
+  }
+
+  // Centraliza el cierre de la partida y los guardados en Firestore.
+  async endGame({ winnerUid, loserUid, distance = null, angle = null, power = null, points = 0, shooterIsLocal = false }){
+    if (this.finished) return;
+    this.finished = true;
+    // block UI
+    this.myTurn = false; this.updateTurnUI();
+    if (this.hintOutput) this.hintOutput.textContent = 'Partida finalizada.';
+    // local uid if present
+    const localUid = firebaseServices_ap.auth.currentUser ? firebaseServices_ap.auth.currentUser.uid : null;
+    try{
+      // If the winner is the local user, award points and compute subject grade
+      if (winnerUid && localUid && winnerUid === localUid) {
+        // Award game points
+        if (points && Number(points) !== 0) {
+          await firebaseServices_ap.addPointsToUser_ap(localUid, points);
+        }
+        // Compute subject grade for 'fisica'
+        let computed = 20 - (3 * (this.failedAttempts || 0)) + (Number(this.lessonScore) || 0);
+        if (computed > 20) computed = 20;
+        if (computed < 0) computed = 0;
+        // Save subject grade
+        await firebaseServices_ap.setSubjectGrade_ap(localUid, 'fisica', computed);
+        // Save match with materia and attempts
+        const saved = await firebaseServices_ap.addMatchResult_ap({ winnerUid, loserUid, distance, angle, power, pointsAwarded: points, materia: 'fisica', subjectScore: computed, attempts: this.recorder.getAttempts() });
+        // Also save a per-user summary so the user can read their matches under their own doc
+        try{
+          await firebaseServices_ap.addUserMatchSummary_ap(localUid, { partidaId: saved.id, winnerUid, loserUid, distance, pointsAwarded: points, materia: 'fisica', subjectScore: computed, attemptsCount: this.recorder.getAttempts().length, fecha: saved.fecha || new Date() });
+        }catch(e){ console.warn('Could not save user summary for winner', e); }
+      } else {
+        // If local is loser but we know winnerUid (even BOT), allow creating the match doc indicating opponent won
+        if (localUid && loserUid && localUid === loserUid) {
+          // Penalize local user for losing: subtract 5 points
+          try{
+            await firebaseServices_ap.addPointsToUser_ap(localUid, -5);
+            if (this.hintOutput) this.hintOutput.textContent = 'Has perdido 5 puntos.';
+          }catch(e){ console.warn('No se pudo restar puntos al perder', e); }
+          // Save match including attempts
+          const saved = await firebaseServices_ap.addMatchResult_ap({ winnerUid, loserUid, distance, angle, power, pointsAwarded: 0, materia: 'fisica', attempts: this.recorder.getAttempts() });
+          // if local user is the loser, save a per-user summary in their own subcollection
+          try{
+            if (localUid && localUid === loserUid) {
+              await firebaseServices_ap.addUserMatchSummary_ap(localUid, { partidaId: saved.id, winnerUid, loserUid, distance, pointsAwarded: 0, materia: 'fisica', attemptsCount: this.recorder.getAttempts().length, fecha: saved.fecha || new Date(), pointsDelta: -5 });
+            }
+          }catch(e){ console.warn('Could not save user summary for loser', e); }
+        } else {
+          // If neither applies, still try to create a match doc if possible (best-effort)
+          try{ await firebaseServices_ap.addMatchResult_ap({ winnerUid, loserUid, distance, angle, power, pointsAwarded: points || 0, materia: 'fisica', attempts: this.recorder.getAttempts() }); }catch(e){}
+        }
+      }
+    }catch(e){ console.warn('endGame: error saving results', e); }
+    // After a short pause show result and redirect to profile so user can see their nota
+    try{
+      setTimeout(()=>{
+        try{
+          window.location.href = 'perfil.html';
+        }catch(e){ console.warn('Redirect failed', e); }
+      }, 1500);
+    }catch(e){/*silent*/}
+  }
+
+  drawGround(){
+    const ctx = this.ctx; const canvas = this.canvas;
+    ctx.fillStyle = '#dfe7dd'; ctx.fillRect(0, canvas.clientHeight-40, canvas.clientWidth, 40);
+  }
+
+  toCanvasX(x){ return this.padding + x * this.scale + 30; }
+  toCanvasY(y){ return this.canvas.clientHeight - 40 - y * this.scale; }
+
+  // compute and store a scale based on current canvas size and distance
+  computeScale(){
+    const canvas = this.canvas;
+    const availableWidth = Math.max(100, canvas.clientWidth - this.padding*2 - 60);
+    // avoid division by zero
+    const worldWidth = Math.max(this.distance, 100);
+    const scaleX = availableWidth / worldWidth;
+    const scaleY = Math.max(1, (canvas.clientHeight - 80) / 100);
+    this.scale = Math.min(scaleX, scaleY);
+    return this.scale;
+  }
+
+  // Given angle (deg) and target distance R, compute required initial speed v
+  computeRequiredPower(angleDeg, R){
+    const g = 9.81;
+    const angle = angleDeg * Math.PI / 180;
+    const s2 = Math.sin(2*angle);
+    if (s2 <= 0) return null; // cannot compute
+    const v2 = (R * g) / s2;
+    if (v2 <= 0) return null;
+    return Math.sqrt(v2);
+  }
+
+  // Given power v and target R, compute a valid angle (deg). Returns smaller solution or null
+  computeAngleForPower(v, R){
+    const g = 9.81;
+    const val = (R * g) / (v*v);
+    if (val > 1 || val < -1) return null;
+    // two solutions for 2θ: arcsin(val) and π - arcsin(val). We choose smaller angle (more direct)
+    const twoTheta = Math.asin(val);
+    const theta = twoTheta / 2;
+    return theta * 180 / Math.PI;
+  }
+
+  // Return detailed steps and value for required power given angle and R
+  computeRequiredPowerWithSteps(angleDeg, R){
+    const g = 9.81;
+    const angle = angleDeg * Math.PI / 180;
+    const s2 = Math.sin(2*angle);
+    if (s2 <= 0) return {value: null, steps: 'sin(2θ) ≤ 0 — ángulo no válido para cálculo de alcance.'};
+    const v2 = (R * g) / s2;
+    if (v2 <= 0) return {value: null, steps: 'Resultado inválido (v² <= 0).'};
+    const v = Math.sqrt(v2);
+    const steps = `Usando R = v²·sin(2θ)/g → v² = R·g / sin(2θ)\nCon R=${R}, g=${g.toFixed(2)}, θ=${angleDeg}° → sin(2θ)=${s2.toFixed(4)}\nEntonces v² = ${ (R*g).toFixed(4) } / ${ s2.toFixed(4) } ≈ ${ v2.toFixed(4) }\nv = √(${ v2.toFixed(4) }) ≈ ${ v.toFixed(3) }`;
+    return { value: v, steps };
+  }
+
+  // For given initial speed v and range R, returns both angle solutions (degrees) or null
+  computeAngleSolutionsForPower(v, R){
+    const g = 9.81;
+    const val = (R * g) / (v*v);
+    if (val > 1 || val < -1) return null;
+    const twoThetaA = Math.asin(val);
+    const twoThetaB = Math.PI - twoThetaA;
+    const thetaA = twoThetaA / 2;
+    const thetaB = twoThetaB / 2;
+    const degA = thetaA * 180 / Math.PI;
+    const degB = thetaB * 180 / Math.PI;
+    return [degA, degB].sort((a,b)=>a-b);
+  }
+
+  // Draw a trajectory preview without registering shots or saving results
+  drawTrajectory(angleDeg, power, color = '#2b8a3e', fromPlayer = 1){
+    const g=9.81; const angle = angleDeg*Math.PI/180; const v0=power;
+    const x0 = (fromPlayer === 1) ? 0 : (this.distance && this.distance>0 ? this.distance : Math.max(100, Math.round((this.canvas.clientWidth - this.padding*2 - 60) / Math.max(this.scale,1))));
+    const vx = (fromPlayer === 1 ? 1 : -1) * v0 * Math.cos(angle);
+    const vy = v0 * Math.sin(angle);
+    const tFlight = (2*vy)/g;
+    const steps = 200;
+    const points = [];
+    for(let i=0;i<=steps;i++){
+      const t = tFlight * (i/steps);
+      const x = x0 + vx * t;
+      const y = vy * t - 0.5 * g * t * t;
+      points.push({x,y});
+    }
+    // draw battlefield then trajectory
+    this.drawBattlefield();
+    const ctx = this.ctx;
+    ctx.beginPath(); ctx.moveTo(this.toCanvasX(points[0].x), this.toCanvasY(points[0].y));
+    for (let p of points) ctx.lineTo(this.toCanvasX(p.x), this.toCanvasY(p.y));
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]);
+    // mark landing
+    const last = points[points.length-1];
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(this.toCanvasX(last.x), this.toCanvasY(0), 6, 0, Math.PI*2); ctx.fill();
+  }
+
+  // drawShot: angleDeg, power, color, fromPlayer (1 or 2)
+  async drawShot(angleDeg, power, color, fromPlayer = 1, shooterUid = null){
+    const g=9.81; const angle = angleDeg*Math.PI/180; const v0=power;
+    // Determine initial world x based on player
+    const x0 = (fromPlayer === 1) ? 0 : this.distance;
+    // determine vx sign: player1 shoots to +x, player2 to -x
+    const vx = (fromPlayer === 1 ? 1 : -1) * v0 * Math.cos(angle);
+    const vy = v0 * Math.sin(angle);
+    const tFlight = (2*vy)/g;
+    const steps = 120;
+
+    // compute and store scale based on battlefield
+    const estimatedRange = Math.abs(v0 * Math.cos(angle) * tFlight) || 1;
+    // ensure computeScale is called so this.scale is set
+    this.computeScale();
+    // if server hasn't provided a distance yet, use an effective distance that places the right cannon at the far edge
+    const canvas = this.canvas;
+    const availableWidth = Math.max(100, canvas.clientWidth - this.padding*2 - 60);
+    const defaultWorld = Math.max(100, Math.round(availableWidth / Math.max(this.scale, 1)));
+    const effectiveDistance = (this.distance && this.distance > 0) ? this.distance : defaultWorld;
+
+    const points = [];
+    for(let i=0;i<=steps;i++){
+      const t = tFlight * (i/steps);
+      const x = x0 + vx * t;
+      const y = vy * t - 0.5 * g * t * t;
+      points.push({x,y});
+    }
+
+    // draw battlefield first (clears canvas) so trajectory is drawn on top
+    this.drawBattlefield();
+    // draw trajectory using unified scale/padding
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(this.toCanvasX(points[0].x), this.toCanvasY(points[0].y));
+    for(let p of points){ ctx.lineTo(this.toCanvasX(p.x), this.toCanvasY(p.y)); }
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+
+    // landing position
+    const last = points[points.length-1];
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(this.toCanvasX(last.x), this.toCanvasY(0), 6, 0, Math.PI*2); ctx.fill();
+
+    // hit detection: target is opponent cannon (use effective distance when not provided)
+    const targetX = (fromPlayer === 1) ? effectiveDistance : 0;
+    const hitTolerance = Math.max(6, effectiveDistance * 0.03); // meters tolerance
+    const landed = last.x;
+    const hit = Math.abs(landed - targetX) <= hitTolerance;
+    // record attempt (POO)
+    try{
+      this.recorder.recordAttempt({ angle: angleDeg, power: v0, landed: landed, targetX: targetX, hit: hit, fromPlayer, shooterUid });
+    }catch(e){ console.warn('recorder error', e); }
+    if(hit){
+      // If already finished, ignore duplicate hits
+      if (this.finished) return;
+      // explosion effect
+      ctx.fillStyle = 'orange'; ctx.beginPath(); ctx.arc(this.toCanvasX(landed), this.toCanvasY(0), 18, 0, Math.PI*2); ctx.fill();
+      this.resultEl.textContent = `¡Impacto! Alcance ≈ ${landed.toFixed(1)} m`;
+      // if the local player was the shooter, award points and save match
+      const localUid = firebaseServices_ap.auth.currentUser ? firebaseServices_ap.auth.currentUser.uid : null;
+      // determine if the shooter corresponds to the currently authenticated user
+      const shooterIsLocal = shooterUid && localUid ? (shooterUid === localUid) : (fromPlayer === this.playerId);
+      // Defensive: avoid saving matches if winner and loser would be the same uid (happens when testing same account)
+      if (shooterIsLocal && localUid) {
+        const loserUid = this.opponentUid || null;
+        if (loserUid && loserUid === localUid) {
+          console.warn('Detected same UID for winner and loser — skipping points/match save to avoid corrupt data.');
+        } else {
+          const points = 10; // points per hit (game points separate from subject grade)
+          try{
+            // Use centralized endGame to store and finalize
+            await this.endGame({ winnerUid: localUid, loserUid, distance: this.distance || null, angle: angleDeg, power, points, shooterIsLocal: true });
+          }catch(e){ console.warn('No se pudo guardar resultado en Firestore (ganador):', e); }
+        }
+      } else {
+        // if local player is the receiver and we know the shooter's uid, save the match record (no points for loser)
+        if (!shooterIsLocal && shooterUid && localUid){
+          if (shooterUid === localUid) {
+            console.warn('Shooter UID equals local UID in receiver branch — skipping save.');
+          } else {
+            try{
+              await this.endGame({ winnerUid: shooterUid, loserUid: localUid, distance: this.distance || null, angle: angleDeg, power, points: 0 });
+            }catch(e){ console.warn('No se pudo guardar resultado en Firestore (perdedor):', e); }
+          }
+        }
+      }
+    } else {
+      this.resultEl.textContent = `Alcance ≈ ${landed.toFixed(1)} m • Error ${ (landed - targetX).toFixed(1)} m`;
+      // If the shooter was the local user and missed, count as failed attempt for subject grading
+      try{
+        const localUidForCount = firebaseServices_ap.auth.currentUser ? firebaseServices_ap.auth.currentUser.uid : null;
+        const shooterIsLocalForCount = shooterUid && localUidForCount ? (shooterUid === localUidForCount) : (fromPlayer === this.playerId);
+        if (shooterIsLocalForCount) this.failedAttempts = (this.failedAttempts || 0) + 1;
+      }catch(e){/*silent*/}
+    }
+  }
+
+  onHint(){
+    try{
+      console.log('CannonGame: hint requested — distance=', this.distance);
+    }catch(e){}
+    const R = Number(this.distance) || 0;
+    if (!R || R <= 0) {
+      const msg = 'Distancia objetivo no definida. Usa "Usar distancia" o espera a que empiece la partida.';
+      if (this.hintOutput) this.hintOutput.textContent = msg;
+      else alert(msg);
+      return;
+    }
+    // Use 45° as default optimal angle for maximum range
+    const angle = 45;
+    const v = this.computeRequiredPower(angle, R);
+    if (!v) {
+      const msg = 'No se pudo calcular la potencia necesaria con el ángulo seleccionado.';
+      if (this.hintOutput) this.hintOutput.textContent = msg;
+      else alert(msg);
+      return;
+    }
+    const suggested = Math.round(v);
+    // Apply suggestion to controls (respect slider max if present)
+    const maxPower = Number(this.powerEl.max) || 1000;
+    const applied = Math.min(suggested, maxPower);
+    this.angleEl.value = angle; this.angleVal.textContent = angle;
+    this.powerEl.value = applied; this.powerVal.textContent = applied;
+    const outMsg = `Sugerencia: ángulo ${angle}°, potencia ${suggested}${applied < suggested ? ' (limitada al máximo del control)' : ''}.`;
+    if (this.hintOutput) this.hintOutput.innerHTML = outMsg;
+    else alert(outMsg);
+  }
+
+  onAutoAngle(){
+    // compute angle solutions for current power and distance, show both with preview/apply
+    const power = Number(this.powerEl.value);
+    const R = Number(this.distance) || 0;
+    if (!R || R <= 0){ if (this.hintOutput) this.hintOutput.textContent = 'Distancia objetivo no definida. Usa "Usar distancia" o espera a que empiece la partida.'; return; }
+    const sols = this.computeAngleSolutionsForPower(power, R);
+    if (!sols){ if (this.hintOutput) this.hintOutput.textContent = 'Con la potencia actual no es posible alcanzar esa distancia (val fuera de rango).'; return; }
+    const [a1,a2] = sols.map(x=>Math.round(x));
+    const html = `<div class="p-3 bg-white rounded border">`+
+      `<div class="font-semibold mb-2">Ángulos posibles para v=${power}</div>`+
+      `<div class="text-sm">Solución 1 (ángulo bajo): <strong>${a1}°</strong></div>`+
+      `<div class="text-sm">Solución 2 (ángulo alto): <strong>${a2}°</strong></div>`+
+      `<div class="mt-2 flex gap-2"><button id="apply-angle-1" class="btn btn-sm btn-primary">Usar ${a1}°</button><button id="preview-angle-1" class="btn btn-sm btn-ghost">Vista previa</button><button id="apply-angle-2" class="btn btn-sm btn-outline">Usar ${a2}°</button><button id="preview-angle-2" class="btn btn-sm btn-ghost">Vista previa</button></div>`+
+      `</div>`;
+    if (this.hintOutput) this.hintOutput.innerHTML = html;
+    setTimeout(()=>{
+      const apply1 = document.getElementById('apply-angle-1');
+      const preview1 = document.getElementById('preview-angle-1');
+      const apply2 = document.getElementById('apply-angle-2');
+      const preview2 = document.getElementById('preview-angle-2');
+      if (apply1) apply1.addEventListener('click', ()=>{ this.angleEl.value = a1; this.angleVal.textContent = a1; this.hintOutput.textContent = `Ángulo ${a1}° aplicado.`; });
+      if (apply2) apply2.addEventListener('click', ()=>{ this.angleEl.value = a2; this.angleVal.textContent = a2; this.hintOutput.textContent = `Ángulo ${a2}° aplicado.`; });
+      if (preview1) preview1.addEventListener('click', ()=>{ this.drawTrajectory(a1, power, '#06b6d4', this.playerId || 1); });
+      if (preview2) preview2.addEventListener('click', ()=>{ this.drawTrajectory(a2, power, '#a78bfa', this.playerId || 1); });
+    },50);
+  }
+
+  reset(){
+    this.angleEl.value = 45; this.powerEl.value = 40; this.angleVal.textContent = 45; this.powerVal.textContent = 40; this.resultEl.textContent = '—';
+    this.ctx.clearRect(0,0,this.canvas.clientWidth,this.canvas.clientHeight);
+    this.drawBattlefield();
+  }
+
+  // draw battlefield with two cannons and target marker
+  drawBattlefield(){
+    const ctx = this.ctx; const canvas = this.canvas;
+    ctx.clearRect(0,0,canvas.clientWidth, canvas.clientHeight);
+    // ground
+    this.drawGround();
+    // compute scale and positions
+    const scale = this.computeScale();
+    // compute effective distance for drawing (if server didn't provide one yet)
+    const availableWidth = Math.max(100, canvas.clientWidth - this.padding*2 - 60);
+    const defaultWorld = Math.max(100, Math.round(availableWidth / Math.max(this.scale, 1)));
+    const effectiveDistance = (this.distance && this.distance > 0) ? this.distance : defaultWorld;
+    const leftX = this.toCanvasX(0);
+    const rightX = this.toCanvasX(effectiveDistance);
+    const baseY = canvas.clientHeight - 60;
+
+    // draw left cannon (faces right)
+    ctx.save();
+    ctx.translate(leftX, baseY);
+    ctx.fillStyle = '#333'; ctx.fillRect(-6, 0, 24, 12);
+    ctx.fillStyle = '#666'; ctx.fillRect(4, -8, 26, 8); // barrel
+    ctx.restore();
+
+    // label left
+    ctx.fillStyle = '#222'; ctx.font = '12px Arial'; ctx.fillText('Cañón A', leftX-18, baseY+28);
+
+    // draw right cannon (faces left)
+    ctx.save();
+    ctx.translate(rightX, baseY);
+    ctx.scale(-1,1);
+    ctx.fillStyle = '#333'; ctx.fillRect(-6, 0, 24, 12);
+    ctx.fillStyle = '#666'; ctx.fillRect(4, -8, 26, 8);
+    ctx.restore();
+
+    // label right
+    ctx.fillStyle = '#222'; ctx.fillText('Cañón B', rightX-12, baseY+28);
+
+    // draw markers at cannon bases
+    ctx.fillStyle = '#0b74de'; ctx.beginPath(); ctx.arc(leftX, baseY+6, 6,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(rightX, baseY+6, 6,0,Math.PI*2); ctx.fill();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Wait for lesson; start game only after lesson finished or skipped
+  const startGame = (opts) => {
+    console.log('Starting CannonGame; lesson result:', opts);
+    // small timeout to ensure overlay hidden before drawing
+    setTimeout(()=> new CannonGame('canvas', { vsBot: !!(opts && opts.vsBot), lessonScore: (opts && typeof opts.score !== 'undefined') ? opts.score : 0 }), 50);
+  };
+  new CannonLesson(startGame);
+});
