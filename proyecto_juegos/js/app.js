@@ -1,8 +1,8 @@
-// Import Firebase services
+// Importar servicios de Firebase
 import { firebaseServices_ap } from './firebase-services.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Small helper to escape HTML to avoid injection when inserting user data
+  // Pequeña función para escapar HTML y evitar inyección al insertar datos de usuario
   const escapeHTML = (unsafe) => {
     if (!unsafe && unsafe !== 0) return '';
     return String(unsafe)
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const registroBtn = document.getElementById('registro-btn');
     if (registroBtn) {
       registroBtn.addEventListener('click', async () => {
-        // Basic validation
+        // Validación básica
         const nombreVal = document.getElementById('nombre')?.value?.trim();
         const apellidoVal = document.getElementById('apellido')?.value?.trim();
         const emailVal = document.getElementById('email')?.value?.trim();
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        // UX: disable button and show spinner
+        // UX: deshabilitar botón y mostrar spinner
         const originalText = registroBtn.innerHTML;
         registroBtn.disabled = true;
         registroBtn.classList.add('btn', 'btn-primary');
@@ -77,14 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
           const cred = await firebaseServices_ap.registerUser_ap(userData_ap, password_ap);
           const uid_ap = cred.user.uid;
 
-          // Try uploading carnet, but don't fail the whole registration if upload is denied
+          // Intentar subir el carnet, pero no fallar todo el registro si la subida es denegada
           let carnetURL = null;
           if (carnetFile) {
             try {
               carnetURL = await firebaseServices_ap.uploadCarnet_ap(uid_ap, carnetFile);
             } catch (uploadErr) {
               console.warn('No se pudo subir el carnet:', uploadErr);
-              // Show a friendly message but continue
+              // Mostrar un mensaje amigable pero continuar
               if (registroMensaje_ap) {
                 registroMensaje_ap.textContent = 'Cuenta creada, pero no se pudo subir la foto del carnet: ' + (uploadErr.message || uploadErr) + '. Revisa las reglas de Storage.';
                 registroMensaje_ap.className = 'mt-4 p-4 rounded-lg bg-yellow-100 text-yellow-800';
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           }
 
-          // Save profile (with or without carnetURL)
+          // Guardar perfil (con o sin carnetURL)
           try {
             const toSave = { institucion: userData_ap.institucion };
             if (carnetURL) toSave.carnetURL = carnetURL;
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Error en el registro: ' + (err.message || err));
           }
         } finally {
-          // restore button in all cases
+          // restaurar botón en todos los casos
           registroBtn.disabled = false;
           registroBtn.innerHTML = originalText;
         }
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await firebaseServices_ap.loginUser_ap(email, password);
         if (loginMensaje_ap) loginMensaje_ap.textContent = '';
         loginForm_ap.reset();
-        // Redirect to profile after login
+        // Redirigir al perfil después del login
         window.location.href = 'perfil.html';
       } catch (err) {
         console.error('Error login:', err);
@@ -184,13 +184,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Auth state listener ---
+  // --- Listener de estado de autenticación ---
   if (firebaseServices_ap && firebaseServices_ap.auth) {
     firebaseServices_ap.onAuthStateChanged_ap(async (user) => {
       if (user) {
         const profile = await firebaseServices_ap.getUserProfile_ap(user.uid);
 
-        // Update navbar: hide auth links and show user menu
+        // Actualizar navbar: ocultar enlaces de autenticación y mostrar menú de usuario
         const loginLink = document.getElementById('login-link');
         const registerLink = document.getElementById('register-link');
         const navAuth = document.getElementById('nav-auth');
@@ -229,13 +229,13 @@ document.addEventListener('DOMContentLoaded', () => {
           const navLogout = document.getElementById('nav-logout');
           if (navLogout) navLogout.addEventListener('click', async () => { await firebaseServices_ap.logoutUser_ap(); window.location.href = 'index.html'; });
 
-          // Close any open dropdown when clicking outside
+          // Cerrar cualquier dropdown abierto al hacer clic fuera
           const closeDropdowns = () => {
             document.querySelectorAll('.dropdown.open').forEach((d) => d.classList.remove('open'));
           };
           document.addEventListener('click', closeDropdowns);
 
-          // Toggle this dropdown
+          // Alternar este dropdown
           const btnEl = document.getElementById('nav-user-btn');
           if (btnEl && dropdown) {
             btnEl.addEventListener('click', (ev) => {
@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load and render matches for this user (use POO MatchDisplay)
           (async () => {
             try {
-              // Prefer per-user summaries (owner-scoped) to avoid cross-user read rules
+              // Preferir resúmenes por usuario (propiedad del dueño) para evitar reglas de lectura entre usuarios
               let matches = [];
               try{
                 matches = await firebaseServices_ap.getUserMatchSummaries_ap(user.uid);
@@ -298,15 +298,30 @@ document.addEventListener('DOMContentLoaded', () => {
               if (!matchesSection || !matchesList) return;
               matchesSection.classList.remove('hidden');
               matchesList.innerHTML = '';
+              // Build a small cache of user profiles (to show names instead of UIDs)
+              const profileCache = {};
+              try{
+                const uids = new Set();
+                (matches || []).forEach(m => { if (m.winnerUid) uids.add(m.winnerUid); if (m.loserUid) uids.add(m.loserUid); });
+                await Promise.all(Array.from(uids).map(async (uid) => {
+                  try{
+                    const p = await firebaseServices_ap.getUserProfile_ap(uid);
+                    if (p) profileCache[uid] = ((p.nombre || '') + ' ' + (p.apellido || '')).trim() || p.email || uid;
+                    else profileCache[uid] = uid;
+                  }catch(e){ profileCache[uid] = uid; }
+                }));
+              }catch(e){ console.warn('Could not preload profile names for matches', e); }
               if (matches && matches.length > 0) {
-                // Define a small POO renderer for matches
+                // Define POO renderer  matches
                 class MatchDisplay {
                   constructor(match){ this.match = match; }
                   render(){
                     const m = this.match;
                     const dateStr = m.fecha && m.fecha.toDate ? m.fecha.toDate().toLocaleString() : (m.fecha ? new Date(m.fecha).toLocaleString() : '');
-                    const winner = escapeHTML(m.winnerUid || 'Desconocido');
-                    const loser = escapeHTML(m.loserUid || '-');
+                    const winnerRaw = m.winnerUid || 'Desconocido';
+                    const loserRaw = m.loserUid || '-';
+                    const winner = escapeHTML(profileCache[winnerRaw] || winnerRaw);
+                    const loser = escapeHTML(profileCache[loserRaw] || loserRaw);
                     const pts = m.pointsAwarded != null ? String(m.pointsAwarded) : '-';
                     const distance = m.distance != null ? String(m.distance) + ' m' : '-';
                     const container = document.createElement('div');

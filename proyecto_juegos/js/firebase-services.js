@@ -1,4 +1,4 @@
-// Import Firebase
+// Importar Firebase
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics.js';
 import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
@@ -6,14 +6,14 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
 import { firebaseConfig_ap } from './firebase-config.js';
 
-// Initialize Firebase
+// Inicializar Firebase
 const app_ap = initializeApp(firebaseConfig_ap);
 const analytics_ap = getAnalytics(app_ap);
 const db_ap = getFirestore(app_ap);
 const auth_ap = getAuth(app_ap);
 const storage_ap = getStorage(app_ap);
 
-// Helpers
+// Utilidades
 const usuariosCollection = (uid) => doc(db_ap, 'usuarios', uid);
 
 const isProfileComplete_ap = (profile) => {
@@ -112,17 +112,17 @@ export const firebaseServices_ap = {
   addMatchResult_ap: async (matchData_ap) => {
     // matchData_ap: { winnerUid, loserUid, distance, angle, power, pointsAwarded, fecha }
     const docData = Object.assign({}, matchData_ap);
-    // ensure pointsAwarded is a number (default 0)
+    // asegurar que pointsAwarded sea un número (por defecto 0)
     docData.pointsAwarded = typeof docData.pointsAwarded === 'number' ? docData.pointsAwarded : 0;
-    // build players array only from present uid strings
+    // construir el array 'players' solo con UIDs presentes
     const players = [];
     if (docData.winnerUid && typeof docData.winnerUid === 'string') players.push(docData.winnerUid);
     if (docData.loserUid && typeof docData.loserUid === 'string') players.push(docData.loserUid);
     if (players.length) docData.players = players;
-    // assign a client timestamp for 'fecha' so it passes security rule checks
-    // (using serverTimestamp() can fail the rules check because it's a sentinel, not a timestamp)
+    // asignar un timestamp cliente en 'fecha' para que pase las reglas de seguridad
+    // (usar serverTimestamp() puede hacer que las reglas lo rechacen porque es un marcador, no un timestamp concreto)
     docData.fecha = new Date();
-    // Remove keys that are null or undefined to satisfy security rules that require numeric types when present
+    // Eliminar claves null o undefined para satisfacer reglas que requieren tipos numéricos cuando están presentes
     Object.keys(docData).forEach((k) => {
       if (docData[k] === null || typeof docData[k] === 'undefined') delete docData[k];
     });

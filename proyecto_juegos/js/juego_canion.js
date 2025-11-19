@@ -1,5 +1,41 @@
 import { firebaseServices_ap } from './firebase-services.js';
 
+// Seguridad: guard inmediato al entrar en la página — redirige si no hay sesión
+(function immediateAuthGuard(){
+  try{
+    // si no hay auth disponible, no permitimos seguir
+    if (!firebaseServices_ap || !firebaseServices_ap.auth) {
+      console.warn('Firebase auth no disponible — bloqueando acceso al juego.');
+      // pequeña espera para evitar flash y luego redirigir
+      setTimeout(()=> { try{ window.location.href = 'login.html'; }catch(e){}; }, 200);
+      return;
+    }
+
+    // Si ya está disponible currentUser, y es null -> redirigir
+    if (firebaseServices_ap.auth.currentUser) return; // ya autenticado
+
+    // Esperar onAuthStateChanged un breve periodo; si después no hay usuario, redirigir
+    const timeoutMs = 1800;
+    let done = false;
+    const unsub = firebaseServices_ap.auth.onAuthStateChanged((user) => {
+      if (done) return; done = true;
+      try{ unsub(); }catch(e){}
+      if (!user) {
+        try{ window.location.href = 'login.html'; }catch(e){}
+      }
+    });
+    // fallback timeout
+    setTimeout(()=>{
+      if (done) return; done = true;
+      try{ if (typeof unsub === 'function') unsub(); }catch(e){}
+      // if still no currentUser, redirect
+      if (!firebaseServices_ap.auth.currentUser) {
+        try{ window.location.href = 'login.html'; }catch(e){}
+      }
+    }, timeoutMs);
+  }catch(e){ console.warn('immediateAuthGuard error', e); }
+})();
+
 // Lesson / quiz controller: shows a brief lesson and small quiz before the game
 class CannonLesson {
   constructor(onComplete){
@@ -143,6 +179,9 @@ class CannonGame {
     if (this.simulateShotBtn) this.simulateShotBtn.addEventListener('click', ()=>{
       // simulate an opponent shot using current UI values but from the opposite side
       try{
+        // require authentication to use simulate when applicable
+        const curUidSim = (firebaseServices_ap && firebaseServices_ap.auth && firebaseServices_ap.auth.currentUser) ? firebaseServices_ap.auth.currentUser.uid : null;
+        if (!curUidSim) { try{ showLoginRequiredModal({ message: 'Debes iniciar sesión para usar esta función.' }); }catch(e){}; return; }
         const angle = Number(this.angleEl.value) || 45;
         const power = Number(this.powerEl.value) || 40;
         const opponentFrom = (this.playerId === 1) ? 2 : 1;
@@ -154,12 +193,39 @@ class CannonGame {
     this.connectWS();
     // If botMode was requested explicitly, enable immediately
     if (this.botMode) this.enableBot();
+    // Authentication-aware: track current user and disable controls if not authenticated
+    try{
+      this.userUid = (firebaseServices_ap && firebaseServices_ap.auth && firebaseServices_ap.auth.currentUser) ? firebaseServices_ap.auth.currentUser.uid : null;
+      // subscribe to auth changes to enable/disable UI dynamically
+      if (firebaseServices_ap && firebaseServices_ap.auth && typeof firebaseServices_ap.auth.onAuthStateChanged === 'function'){
+        firebaseServices_ap.auth.onAuthStateChanged((u)=>{
+          this.userUid = u ? u.uid : null;
+          try{ this.updateAuthUI(); }catch(e){}
+        });
+      }
+    }catch(e){ console.warn('Auth subscribe failed', e); }
     this.distance = 0;
     this.failedAttempts = 0; // number of failed launches by the local player in this match
     this.distanceEl = document.getElementById('distance');
     this.padding = 40; // padding (px) from canvas edges for world-to-canvas mapping
     this.scale = 1;
     this.reset();
+  }
+
+  updateAuthUI(){
+    // Disable interactive controls if no authenticated user
+    const isAuthed = !!this.userUid;
+    try{
+      if (this.launchBtn) {
+        if (!isAuthed) { this.launchBtn.setAttribute('disabled',''); this.launchBtn.title = 'Inicia sesión para jugar'; }
+        else { this.launchBtn.removeAttribute('disabled'); this.launchBtn.title = ''; }
+      }
+      if (this.simulateShotBtn) {
+        if (!isAuthed) { this.simulateShotBtn.setAttribute('disabled',''); this.simulateShotBtn.title = 'Inicia sesión para usar simulate'; }
+        else { this.simulateShotBtn.removeAttribute('disabled'); this.simulateShotBtn.title = ''; }
+      }
+      // also hide bot enable control if needed
+    }catch(e){ console.warn('updateAuthUI error', e); }
   }
 
   connectWS(){
@@ -252,6 +318,9 @@ class CannonGame {
   onLaunch(){
     if (this.finished) return;
     if(!this.myTurn) return;
+    // require authentication before launching
+    const curUid = (firebaseServices_ap && firebaseServices_ap.auth && firebaseServices_ap.auth.currentUser) ? firebaseServices_ap.auth.currentUser.uid : null;
+    if (!curUid) { try{ showLoginRequiredModal({ message: 'Debes iniciar sesión para disparar.' }); }catch(e){}; return; }
     const angle = Number(this.angleEl.value);
     const power = Number(this.powerEl.value);
     // draw local shot in red (origin depends on player) and include our uid in the message
@@ -318,14 +387,51 @@ class CannonGame {
         }
       }
     }catch(e){ console.warn('endGame: error saving results', e); }
-    // After a short pause show result and redirect to profile so user can see their nota
+    // Show a result modal for the local player (Ganaste / Perdiste / Partida finalizada)
     try{
-      setTimeout(()=>{
-        try{
-          window.location.href = 'perfil.html';
-        }catch(e){ console.warn('Redirect failed', e); }
-      }, 1500);
-    }catch(e){/*silent*/}
+      const isLocalWinner = (!!winnerUid && !!localUid && winnerUid === localUid);
+      const isLocalLoser = (!!loserUid && !!localUid && loserUid === localUid);
+      let title = 'Partida finalizada';
+      let message = 'La partida ha terminado.';
+      if (isLocalWinner) { title = '¡Ganaste!'; message = 'Has vencido en la partida. Serás redirigido a tu perfil.'; }
+      else if (isLocalLoser) { title = 'Perdiste'; message = 'Has perdido la partida. Serás redirigido a tu perfil.'; }
+      else { message = 'Resultado conocido — serás redirigido al perfil.'; }
+      this.showResultModal({ title, message, autoRedirect: true, redirectAfterMs: 2000 });
+    }catch(e){ console.warn('showResultModal failed', e); }
+  }
+
+  // Crea y muestra un modal sencillo con resultado; opcionalmente redirige automáticamente
+  showResultModal({ title = 'Resultado', message = '', autoRedirect = false, redirectAfterMs = 1800 } = {}){
+    try{
+      // Evitar crear múltiples modales
+      if (this._resultModal) {
+        // actualizar texto y mostrar
+        const t = this._resultModal.querySelector('.result-title');
+        const m = this._resultModal.querySelector('.result-message');
+        if (t) t.textContent = title; if (m) m.textContent = message;
+        this._resultModal.style.display = 'flex';
+      } else {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed'; overlay.style.inset = '0'; overlay.style.display = 'flex'; overlay.style.alignItems = 'center'; overlay.style.justifyContent = 'center'; overlay.style.background = 'rgba(0,0,0,0.6)'; overlay.style.zIndex = '9999';
+        const panel = document.createElement('div');
+        panel.style.background = '#fff'; panel.style.padding = '22px'; panel.style.borderRadius = '10px'; panel.style.minWidth = '280px'; panel.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)'; panel.style.textAlign = 'center';
+        const h = document.createElement('div'); h.className = 'result-title'; h.style.fontSize = '20px'; h.style.fontWeight = '700'; h.style.marginBottom = '8px'; h.textContent = title;
+        const p = document.createElement('div'); p.className = 'result-message'; p.style.fontSize = '14px'; p.style.color = '#333'; p.style.marginBottom = '14px'; p.textContent = message;
+        const btn = document.createElement('button'); btn.textContent = 'Ir al perfil'; btn.className = 'btn-result';
+        btn.style.padding = '8px 12px'; btn.style.borderRadius = '6px'; btn.style.border = 'none'; btn.style.background = '#0b74de'; btn.style.color = '#fff'; btn.style.cursor = 'pointer';
+        btn.addEventListener('click', ()=>{ try{ window.location.href = 'perfil.html'; }catch(e){ console.warn('Redirect failed', e); } });
+        panel.appendChild(h); panel.appendChild(p); panel.appendChild(btn); overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+        this._resultModal = overlay;
+      }
+      // Disable UI while modal visible
+      try{ this.launchBtn.setAttribute('disabled',''); }catch(e){}
+      if (autoRedirect) {
+        setTimeout(()=>{
+          try{ window.location.href = 'perfil.html'; }catch(e){ console.warn('Auto redirect failed', e); }
+        }, redirectAfterMs);
+      }
+    }catch(e){ console.warn('showResultModal error', e); }
   }
 
   drawGround(){
@@ -627,11 +733,71 @@ class CannonGame {
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  // Wait for lesson; start game only after lesson finished or skipped
-  const startGame = (opts) => {
-    console.log('Starting CannonGame; lesson result:', opts);
-    // small timeout to ensure overlay hidden before drawing
-    setTimeout(()=> new CannonGame('canvas', { vsBot: !!(opts && opts.vsBot), lessonScore: (opts && typeof opts.score !== 'undefined') ? opts.score : 0 }), 50);
-  };
-  new CannonLesson(startGame);
+  // Before showing the lesson or starting the game, ensure the user is authenticated.
+  (async function(){
+    try{
+      const uid = await ensureAuthenticated();
+      if (!uid) {
+        // Not authenticated: show login modal and do not initialize the lesson/game
+        showLoginRequiredModal({ message: 'Debes iniciar sesión para jugar. Serás redirigido a la página de inicio de sesión.' });
+        return;
+      }
+      // Authenticated -> allow lesson and game start
+      const startGame = async (opts) => {
+        console.log('Starting CannonGame; lesson result:', opts);
+        setTimeout(()=> new CannonGame('canvas', { vsBot: !!(opts && opts.vsBot), lessonScore: (opts && typeof opts.score !== 'undefined') ? opts.score : 0 }), 50);
+      };
+      new CannonLesson(startGame);
+    }catch(e){ console.warn('Auth check on page load failed', e); showLoginRequiredModal({ message: 'Debes iniciar sesión para jugar.' }); }
+  })();
 });
+
+// Espera la resolución del estado de autenticación una vez y devuelve el uid o null
+function ensureAuthenticated(timeoutMs = 3000){
+  return new Promise((resolve)=>{
+    try{
+      if (!firebaseServices_ap || !firebaseServices_ap.auth) return resolve(null);
+      // If currentUser is already set, resolve immediately
+      const cur = firebaseServices_ap.auth.currentUser;
+      if (cur) return resolve(cur.uid);
+      // Otherwise wait for onAuthStateChanged (single-shot)
+      const unsub = firebaseServices_ap.auth.onAuthStateChanged((user)=>{
+        try{ unsub(); }catch(e){}
+        if (user) return resolve(user.uid);
+        return resolve(null);
+      });
+      // safety timeout: resolve null if auth doesn't respond
+      setTimeout(()=>{ try{ if (typeof unsub === 'function') unsub(); }catch(e){}; resolve(null); }, timeoutMs);
+    }catch(e){ console.warn('ensureAuthenticated error', e); resolve(null); }
+  });
+}
+
+// Modal que indica que es necesario iniciar sesión y redirige a `login.html`
+function showLoginRequiredModal({ title = 'Inicio de sesión requerido', message = 'Necesitas iniciar sesión para jugar.', autoRedirectMs = 2500 } = {}){
+  try{
+    // If there's already a global result modal created by CannonGame instances reuse it
+    if (window._globalLoginModal) {
+      const modal = window._globalLoginModal;
+      const t = modal.querySelector('.login-title');
+      const m = modal.querySelector('.login-message');
+      if (t) t.textContent = title; if (m) m.textContent = message;
+      modal.style.display = 'flex';
+      return;
+    }
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed'; overlay.style.inset = '0'; overlay.style.display = 'flex'; overlay.style.alignItems = 'center'; overlay.style.justifyContent = 'center'; overlay.style.background = 'rgba(0,0,0,0.6)'; overlay.style.zIndex = '10000';
+    const panel = document.createElement('div'); panel.style.background = '#fff'; panel.style.padding = '20px'; panel.style.borderRadius = '10px'; panel.style.minWidth = '300px'; panel.style.textAlign = 'center'; panel.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
+    const h = document.createElement('div'); h.className = 'login-title'; h.style.fontSize = '18px'; h.style.fontWeight = '700'; h.style.marginBottom = '8px'; h.textContent = title;
+    const p = document.createElement('div'); p.className = 'login-message'; p.style.fontSize = '14px'; p.style.color = '#333'; p.style.marginBottom = '12px'; p.textContent = message;
+    const btnLogin = document.createElement('button'); btnLogin.textContent = 'Iniciar sesión'; btnLogin.style.marginRight = '8px'; btnLogin.style.padding = '8px 12px'; btnLogin.style.border = 'none'; btnLogin.style.borderRadius = '6px'; btnLogin.style.background = '#0b74de'; btnLogin.style.color = '#fff'; btnLogin.style.cursor = 'pointer';
+    btnLogin.addEventListener('click', ()=>{ try{ window.location.href = 'login.html'; }catch(e){ console.warn('redirect to login failed', e); } });
+    const btnRegister = document.createElement('button'); btnRegister.textContent = 'Registrarse'; btnRegister.style.padding = '8px 12px'; btnRegister.style.border = '1px solid #ddd'; btnRegister.style.borderRadius = '6px'; btnRegister.style.background = '#fff'; btnRegister.style.cursor = 'pointer';
+    btnRegister.addEventListener('click', ()=>{ try{ window.location.href = 'registro.html'; }catch(e){ console.warn('redirect to registro failed', e); } });
+    panel.appendChild(h); panel.appendChild(p); panel.appendChild(btnLogin); panel.appendChild(btnRegister); overlay.appendChild(panel); document.body.appendChild(overlay);
+    window._globalLoginModal = overlay;
+    // Auto-redirect to login after a short delay to help the user
+    if (autoRedirectMs && typeof autoRedirectMs === 'number'){
+      setTimeout(()=>{ try{ window.location.href = 'login.html'; }catch(e){ /*ignore*/ } }, autoRedirectMs);
+    }
+  }catch(e){ console.warn('showLoginRequiredModal error', e); }
+}
