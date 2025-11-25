@@ -1,0 +1,41 @@
+/* Fallback styles for static viewing (loaded by index.html and other pages)
+   These mirror the avatar and dropdown styles so the header looks correct
+   even when not served through Vite (dev server). */
+
+/* Avatar */
+.avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+  background-color: #1E6F5C;
+}
+
+.avatar.bg-primary { background-color: #1E6F5C; }
+.avatar.bg-secondary { background-color: #289672; }
+
+/* Dropdown */
+.dropdown { position: relative; }
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  margin-top: 0.5rem;
+  background: white;
+  color: #111827;
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  min-width: 10rem;
+  overflow: hidden;
+  z-index: 60;
+}
+.dropdown.open .dropdown-menu { display: block; }
+.dropdown-menu a, .dropdown-menu button { display:block; padding:0.6rem 0.9rem; }
+
+/* Mobile menu fallbacks */
+#mobile-menu { display: none; }
