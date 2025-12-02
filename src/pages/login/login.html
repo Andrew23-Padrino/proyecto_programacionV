@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="/img/NovaCiencia/Logo_peqe.ico"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#1E6F5C",
+              secondary: "#289672",
+              accent: "#29BB89",
+              light: "#E6DD3B",
+              dark: "#1A5653",
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="/src/style.css" />
+    <title>Iniciar sesión — NovaCiencia academy</title>
+  </head>
+  <body class="bg-gray-50 font-sans">
+    <!-- Header (rendered by component) -->
+    <div id="header-root"></div>
+
+    <main class="py-16">
+      <div class="container mx-auto px-4 max-w-2xl">
+        <div class="bg-white p-8 rounded-lg shadow-lg">
+          <h2 class="text-3xl font-bold text-primary mb-4 text-center">
+            Iniciar sesión
+          </h2>
+          <p class="text-gray-600 mb-6 text-center">
+            Accede a tu cuenta para continuar.
+          </p>
+
+          <form id="login-form" class="space-y-6">
+            <div>
+              <label for="login-email" class="block text-gray-700 mb-2"
+                >Correo electrónico</label
+              >
+              <input
+                type="email"
+                id="login-email"
+                class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                required
+              />
+            </div>
+            <div>
+              <label for="login-password" class="block text-gray-700 mb-2"
+                >Contraseña</label
+              >
+              <input
+                type="password"
+                id="login-password"
+                class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                required
+              />
+            </div>
+            <div>
+              <button
+                type="submit"
+                class="w-full bg-primary hover:bg-dark text-white font-bold py-3 px-6 rounded-lg transition-colors"
+              >
+                Entrar
+              </button>
+            </div>
+          </form>
+          <div id="login-mensaje" class="mt-4 text-sm text-red-600"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (rendered by component) -->
+    <div id="footer-root"></div>
+
+    <script type="module" src="/src/js/app.js"></script>
+    <script type="module" src="/src/pages/login/login.js"></script>
+  </body>
+</html>

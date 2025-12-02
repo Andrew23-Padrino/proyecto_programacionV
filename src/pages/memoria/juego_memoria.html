@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Juego de Memoria — Animales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="bg-gray-50 font-sans">
+    <div id="header-root"></div>
+    <main class="container mx-auto px-4 py-12">
+      <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <div class="flex flex-col md:flex-row gap-6 items-start">
+          <div class="flex-1">
+            <h2 class="text-2xl font-bold text-primary mb-2">Memoria — Animales</h2>
+            <p class="text-gray-700 mb-4">Empareja las cartas con animales iguales. No requiere inicio de sesión ni guardado.</p>
+            <div id="game-area" class="bg-gray-50 p-4 rounded relative">
+              <canvas id="memoria-canvas" width="800" height="520" class="w-full h-80 md:h-96 border rounded bg-white"></canvas>
+              <div class="mt-3 flex items-center gap-3">
+                <button id="memoria-reset" class="btn btn-primary">Reiniciar</button>
+                <span id="memoria-info" class="ml-2 text-sm text-gray-600">Haz clic en las cartas para voltearlas.</span>
+              </div>
+            </div>
+          </div>
+          <aside class="w-56">
+            <div class="bg-white p-3 rounded shadow-sm">
+              <h3 class="font-semibold mb-2">Instrucciones</h3>
+              <ul class="text-sm text-gray-700 space-y-2">
+                <li>1. Haz clic en una carta para verla.</li>
+                <li>2. Encuentra su pareja antes de que se voltee.</li>
+                <li>3. Al emparejar todas las cartas ganas el juego.</li>
+              </ul>
+              <div class="mt-3 text-xs text-gray-500">Temática: Animales (emojis). Juego sencillo sin puntajes.</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="/src/js/app.js"></script>
+    <script type="module" src="/src/games/memoria/index.js"></script>
+    <script>
+      // Wire reset button to canvas game instance (simple approach)
+      document.addEventListener('click', (e)=>{
+        if (e.target && e.target.id === 'memoria-reset'){
+          try{ const win = document.getElementById('nc-memoria-result'); if (win) win.remove(); const ev = new Event('memoria:reset'); window.dispatchEvent(ev); }
+          catch(e){ console.warn(e); }
+        }
+      });
+      // listen to reset event to call reset on game if available
+      window.addEventListener('memoria:reset', ()=>{
+        try{ const canvas = document.getElementById('memoria-canvas'); if (!canvas) return; // attempt to find window-held instance
+          // If module kept instance via DOM, try to access via canvas.__memoriaInstance
+          if (canvas.__memoriaInstance && typeof canvas.__memoriaInstance.reset === 'function') canvas.__memoriaInstance.reset(); else location.reload();
+        }catch(e){ location.reload(); }
+      });
+    </script>
+        <!-- Footer root (mounted by src/js/nav.js -> mountShell) -->
+    <div id="footer-root"></div>
+  </body>
+</html>

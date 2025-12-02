@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="/img/NovaCiencia/Logo_peqe.ico"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#1E6F5C",
+              secondary: "#289672",
+              accent: "#29BB89",
+              light: "#E6DD3B",
+              dark: "#1A5653",
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="/src/style.css" />
+    <title>Mi Perfil — NovaCiencia academy</title>
+  </head>
+  <body class="bg-gray-50 font-sans">
+    <!-- Header (rendered by component) -->
+    <div id="header-root"></div>
+
+    <main class="py-16">
+      <div class="container mx-auto px-4 max-w-full w-full">
+        <div
+          class="bg-white p-8 rounded-lg shadow-lg transition-transform transform hover:-translate-y-1"
+        >
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div class="col-span-1 flex flex-col items-center">
+              <div
+                id="profile-avatar"
+                class="w-36 h-36 rounded-full bg-gray-50 flex items-center justify-center text-3xl font-bold text-gray-700 overflow-hidden shadow-md mb-4 border border-gray-100"
+              >
+                <!-- Avatar o imagen de carnet -->
+              </div>
+              <div
+                id="profile-status"
+                class="mt-2 text-sm font-medium text-muted"
+              ></div>
+              <!-- Placeholder para mostrar notas/materias (será actualizado por js/app.js) -->
+              <div id="profile-materias" class="mt-2 text-sm text-gray-700">
+                <strong>Física:</strong> -
+              </div>
+            </div>
+
+            <div class="md:col-span-2">
+              <h2 class="text-2xl font-extrabold text-primary mb-2">
+                Mi perfil
+              </h2>
+              <p class="text-gray-600 mb-4">
+                Completa tus datos para desbloquear todas las funciones.
+              </p>
+
+              <div id="profile-logged-out" class="mb-4">
+                Por favor inicia sesión para editar tu perfil.
+              </div>
+
+              <form id="profile-form" class="space-y-4 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-gray-700 mb-2">Nombre</label>
+                    <input
+                      type="text"
+                      id="profile-nombre"
+                      class="form-input w-full px-4 py-2 border border-gray-200 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 mb-2">Apellido</label>
+                    <input
+                      type="text"
+                      id="profile-apellido"
+                      class="form-input w-full px-4 py-2 border border-gray-200 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-gray-700 mb-2">Institución</label>
+                  <input
+                    type="text"
+                    id="profile-institucion"
+                    class="form-input w-full px-4 py-2 border border-gray-200 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-gray-700 mb-2">Correo</label>
+                  <input
+                    type="email"
+                    id="profile-email"
+                    class="form-input w-full px-4 py-2 border border-gray-200 rounded-lg"
+                    disabled
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-gray-700 mb-2"
+                    >Foto del carnet</label
+                  >
+                  <input type="file" id="profile-carnet" accept="image/*" />
+                  <div id="profile-carnet-preview" class="mt-2"></div>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                  <button
+                    id="save-profile"
+                    type="button"
+                    class="btn btn-primary"
+                  >
+                    Guardar perfil
+                  </button>
+                  <button id="logout-btn" type="button" class="btn btn-ghost">
+                    Cerrar sesión
+                  </button>
+                </div>
+              </form>
+              <!-- Match history -->
+              <div id="matches-section" class="mt-8 hidden">
+                <h3 class="text-xl font-semibold mb-3">
+                  Historial de partidas
+                </h3>
+                <div class="overflow-x-auto bg-white rounded-lg border p-4">
+                  <table id="matches-table" class="w-full text-sm">
+                    <thead>
+                      <tr class="bg-gray-100 text-left">
+                        <th class="px-4 py-3">Fecha</th>
+                        <th class="px-4 py-3">Juego</th>
+                        <th class="px-4 py-3">Resultado</th>
+                        <th class="px-4 py-3">Puntos</th>
+                        <th class="px-4 py-3">Materia</th>
+                        <th class="px-4 py-3">Nota</th>
+                        <th class="px-4 py-3">Intentos</th>
+                      </tr>
+                    </thead>
+                    <tbody id="matches-table-body"></tbody>
+                  </table>
+                </div>
+                <div
+                  id="matches-pager"
+                  class="mt-3 flex items-center justify-between"
+                >
+                  <div id="matches-count" class="text-sm text-gray-600"></div>
+                  <div class="flex items-center gap-2">
+                    <button id="matches-prev" class="btn btn-ghost">
+                      Anterior
+                    </button>
+                    <button id="matches-next" class="btn btn-ghost">
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (rendered by component) -->
+    <div id="footer-root"></div>
+
+    <script type="module" src="/src/js/app.js"></script>
+  </body>
+</html>

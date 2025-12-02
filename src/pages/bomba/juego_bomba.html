@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Desactivación de Bomba — NovaCiencia academy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="bg-gray-50 font-sans">
+    <!-- Header (rendered by component) -->
+    <div id="header-root"></div>
+
+    <main class="container mx-auto px-4 py-12">
+      <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <div class="flex flex-col md:flex-row gap-6 items-center">
+          <img src="/src/assets/img/bomba.png" alt="Bomba" class="w-48 h-48 object-contain">
+          <div>
+            <h2 class="text-2xl font-bold text-primary mb-2">Desactivación de Bomba (Electricidad)</h2>
+            <p class="text-gray-700 mb-4">Corta los cables en el orden correcto siguiendo pistas eléctricas y evita que la bomba explote. Explicación breve de conceptos: conductor, aislante y circuito.</p>
+
+            <!-- Lesson overlay: will be controlled by BombLesson.js -->
+            <div id="lesson-overlay" class="absolute inset-0 z-40 flex items-center justify-center bg-black bg-opacity-60">
+              <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+                <div id="lesson-slides" class="space-y-4">
+                  <div class="lesson-slide" data-slide="0">
+                    <h3 class="text-xl font-semibold mb-2">Introducción a electricidad</h3>
+                    <p class="text-sm text-gray-700">En esta lección aprenderás conceptos básicos: conductores permiten el paso de corriente; aislantes no. Entender esto te ayudará a identificar qué cable cortar.</p>
+                  </div>
+                  <div class="lesson-slide hidden" data-slide="1">
+                    <h3 class="text-xl font-semibold mb-2">Conceptos clave</h3>
+                    <p class="text-sm text-gray-700 mb-2">Los metales suelen ser buenos conductores; materiales como plástico o madera son aislantes. En el juego, cada color representa un nodo en el circuito conectado a la bomba (la "pelota").</p>
+                    <ul class="text-sm text-gray-700 ml-4 mt-2 space-y-1">
+                      <li><strong class="text-red-600">Rojo:</strong> Nodo de alimentación (fuente) — cortar primero suele detener la corriente.</li>
+                      <li><strong class="text-blue-600">Azul:</strong> Nodo intermedio (relay/resistencia) — su posición afecta el orden.</li>
+                      <li><strong class="text-green-600">Verde:</strong> Nodo de tierra/seguro — suele cerrarse al final.</li>
+                    </ul>
+                    <p class="text-sm text-gray-700 mt-2">Durante la partida observa las pistas (brillo, pulso y el punto animado) para identificar el siguiente cable a cortar.</p>
+                  </div>
+                  <div class="lesson-slide hidden" data-slide="2">
+                    <h3 class="text-xl font-semibold mb-2">Pequeña prueba</h3>
+                    <p class="text-sm text-gray-700 mb-2">Responde rápido: ¿Cuál de los siguientes es un buen conductor?</p>
+                    <form id="lesson-quiz" class="mt-2 space-y-3">
+                      <div>
+                        <label class="text-gray-700"><input type="radio" name="q1" value="aislante"> Plástico</label>
+                      </div>
+                      <div>
+                        <label class="text-gray-700"><input type="radio" name="q1" value="conductor"> Metal</label>
+                      </div>
+                      <div>
+                        <label class="text-gray-700"><input type="radio" name="q1" value="otro"> Madera</label>
+                      </div>
+                    </form>
+                    <div class="mt-3">
+                      <label class="text-sm text-gray-700">Modo de práctica:</label>
+                      <select id="lesson-order-select" class="mt-1 border rounded p-2 text-sm">
+                        <option value="random">Aleatorio (más desafiante)</option>
+                        <option value="teaching" selected>Seguir orden didáctico: Rojo → Azul → Verde</option>
+                      </select>
+                      <p class="text-xs text-gray-500 mt-2">Si eliges el modo didáctico, la partida usará el orden Rojo → Azul → Verde para que puedas practicar la relación entre colores y nodos.</p>
+                    </div>
+                    <div class="mt-3 flex items-center gap-3">
+                      <button id="lesson-start-game" class="btn btn-primary">Jugar</button>
+                      <div id="lesson-feedback" class="text-sm text-gray-700"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-4 flex justify-between">
+                  <button id="lesson-prev" class="btn btn-ghost">Anterior</button>
+                  <div>
+                    <button id="lesson-skip" class="btn btn-ghost mr-2">Saltar lección</button>
+                    <button id="lesson-next" class="btn btn-primary">Siguiente</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="game-area" class="bg-gray-50 p-4 rounded relative">
+              <canvas id="bomb-canvas" width="800" height="420" class="w-full h-72 md:h-96 border rounded bg-white"></canvas>
+              <div class="mt-3 flex items-center gap-3">
+                <button id="reset" class="btn btn-primary">Reiniciar</button>
+                <button id="hint" class="btn btn-ghost">Pista</button>
+                <span id="status" class="ml-4 text-sm text-gray-600"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 text-sm text-gray-500">Consejo: los colores representan nodos en un circuito simple; prueba diferentes combinaciones y observa la retroalimentación.</div>
+      </div>
+    </main>
+
+    <script type="module" src="/src/js/app.js"></script>
+    <script type="module" src="/src/games/bomba/index.js"></script>
+        <!-- Footer root (mounted by src/js/nav.js -> mountShell) -->
+    <div id="footer-root"></div>
+  </body>
+</html>

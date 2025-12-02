@@ -1,0 +1,21 @@
+/* Estilos globales mínimos para los juegos (importar desde main.js si quieres) */
+.game-root {
+  padding: 1.5rem; /* p-6 */
+  background-color: #ffffff; /* bg-white */
+  border-radius: 0.5rem; /* rounded-lg */
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); /* shadow-md */
+}
+
+.game-header {
+  font-size: 1.5rem; /* approximate text-2xl */
+  font-weight: 700; /* font-bold */
+  margin-bottom: 1rem; /* mb-4 */
+  color: #1E6F5C; /* text-primary (custom color) */
+}
+
+.game-canvas {
+  min-height: 240px;
+  background-color: #F3F4F6; /* bg-gray-100 */
+  border-radius: 0.375rem; /* rounded-md */
+  border: 1px solid #E5E7EB; /* border-gray-200 */
+}

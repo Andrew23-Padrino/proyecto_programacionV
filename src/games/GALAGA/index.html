@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/login.css">
+</head>
+
+<body>
+  <main>
+    <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+      <div class="sm:mx-auto sm:w-full sm:max-w-sm">
+        <img class="mx-auto h-10 w-auto" src="./img/alien-magenta.png" width="60" height="60" alt="">
+        <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-white">Registrate</h2>
+      </div>
+
+      <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+        <form id="formulario" class="space-y-6" action="#" method="POST" novalidate>
+          <div>
+            <label for="correo" class="block text-sm font-medium leading-6 text-white">Email</label>
+            <div class="mt-2">
+              <input id="correo" name="correo" type="text" required
+                class="block w-full rounded-md border-0 py-1.5 text-gray-900 px-2 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 input">
+            </div>
+          </div>
+          <div>
+            <label for="nombreUsuario" class="block text-sm font-medium leading-6 text-white">Username</label>
+            <div class="mt-2">
+              <input id="nombreUsuario" name="nombreUsuario" type="text" required
+                class="block w-full rounded-md border-0 py-1.5 text-gray-900 px-2 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 input">
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <label for="clave" class="block text-sm font-medium leading-6 text-white">Clave</label>
+
+            </div>
+            <div class="mt-2">
+              <input id="clave" name="clave" type="password" autocomplete="current-password" required
+                class="block w-full rounded-md border-0 py-1.5 px-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+            </div>
+          </div>
+
+          <div>
+            <button type="submit"
+              class="flex w-full justify-center rounded-md  px-3 py-1.5 text-sm font-semibold boton">REGISTRAR</button>
+          </div>
+        </form>
+
+        <p class="mt-10 text-center text-sm text-gray-500">
+          ¿Ya tienes una cuenta?
+          <a href="./login.html" class="font-semibold leading-6 enlace">Ingresa Aquí</a>
+        </p>
+      </div>
+    </div>
+
+  </main>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="js/registro.js" type="module"></script>
+
+</html>

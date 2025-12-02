@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Minimal custom styles that don't conflict with the page layout.
+   Keep visual parity with the original CDN-based page by relying on
+   Tailwind utility classes in the HTML (index.html). */
+
+/* Logo helpers */
+.logo {
+  width: 6rem;
+  height: 6rem;
+}
+
+/* Keep default body styles light so Tailwind classes in index.html take effect. */
+html, body {
+  height: 100%;
+}
+
+/* Small readable defaults (won't override Tailwind utility classes) */
+body {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Avatar for initials when no image is available */
+.avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Provide utility fallback color classes for avatars so JS can add `bg-primary` or `bg-secondary` */
+.avatar.bg-primary { background-color: #1E6F5C; }
+.avatar.bg-secondary { background-color: #289672; }
+
+/* Dropdown styles for nav user */
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  margin-top: 0.5rem;
+  background: white;
+  color: #111827;
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  min-width: 10rem;
+  overflow: hidden;
+  z-index: 60;
+}
+.dropdown-menu a,
+.dropdown-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+.dropdown-menu a:hover,
+.dropdown-menu button:hover {
+  background: #f3f4f6;
+}
+.dropdown.open .dropdown-menu {
+  display: block;
+}
+
+/* Mobile menu links inside header */
+#mobile-menu a {
+  padding: 0.5rem 0;
+}
+
+/* Place Tailwind @apply rules inside the components layer so utilities are available */
+/* Fallback explicit styles to avoid PostCSS/@apply issues in some environments */
+.form-input { background-color: white; }
+.btn { padding: 0.5rem 1rem; border-radius: 0.375rem; }
+.btn-primary { background-color: #1E6F5C; color: white; }
+.btn-ghost { background-color: transparent; border: 1px solid #e5e7eb; color: #374151; }
+
+/* Nav user / avatar sizing and mobile dropdown adjustments */
+#nav-user, #mobile-user-area {
+  font-size: 0.95rem;
+}
+
+#nav-user .avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1rem;
+}
+
+/* Ensure the nav-user button text is normal size, not inherited from headings */
+#nav-user #nav-user-btn {
+  font-size: 0.95rem;
+}
+
+/* Mobile: when user dropdown is inside the mobile menu, render items as stacked white-text links */
+#mobile-menu .dropdown-menu {
+  position: static;
+  background: transparent;
+  box-shadow: none;
+  display: none;
+}
+#mobile-menu .dropdown.open .dropdown-menu {
+  display: block;
+}
+#mobile-menu .dropdown-menu a,
+#mobile-menu .dropdown-menu button {
+  color: white;
+  padding: 0.5rem 0;
+  background: transparent;
+}
+
+/* Make sure the avatar and name align nicely inside mobile menu */
+#mobile-menu .dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Force normal font sizes for user area inside mobile menu */
+#mobile-menu #mobile-user-area,
+#mobile-menu #mobile-user-area *,
+#mobile-menu #mobile-auth-area,
+#mobile-menu #mobile-auth-area * {
+  font-size: 1rem !important;
+  line-height: 1.2 !important;
+}
+
+/* Slightly larger avatar for mobile menu for better visibility */
+#mobile-menu .avatar {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  font-size: 1rem !important;
+}
+
+/* Ensure dropdown button text in mobile is not treated as heading */
+#mobile-menu .dropdown button#nav-user-btn,
+#mobile-menu .dropdown button#nav-user-btn span {
+  font-size: 1rem !important;
+  font-weight: 600;
+}
+
+/* Lesson overlay and lesson slide styles (used by BombLesson and CannonLesson) */
+#lesson-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.6);
+  z-index: 9998;
+}
+.lesson-slide { display: block; }
+.lesson-slide.hidden { display: none; }
+.lesson-slide .btn { margin-top: 0.5rem; }
+
+/* Buttons used across lessons/games to keep consistent look when Tailwind is absent */
+.btn { display: inline-block; padding: 0.5rem 0.9rem; border-radius: 0.375rem; cursor: pointer; font-weight: 600; }
+.btn-primary { background: #1E6F5C; color: white; border: none; }
+.btn-ghost { background: transparent; border: 1px solid rgba(0,0,0,0.06); color: #374151; }
+
+/* Small explosion/feedback animation used by BombGame */
+.nc-explosion { position: absolute; pointer-events: none; border-radius: 999px; transform: translate(-50%, -50%); opacity: 0.95; }
+
