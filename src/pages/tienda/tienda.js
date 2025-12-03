@@ -1,4 +1,5 @@
 import { firebaseServices_ap } from '/src/games/originales/firebase-services.js'
+import { ensureAuthenticated, showLoginRequiredModal } from '/src/games/bomba/utils.js'
 
 async function getOptionalToken(){
   try{
@@ -12,14 +13,6 @@ async function getOptionalToken(){
       const unsub = auth.onAuthStateChanged(async (u)=>{ if (done) return; done = true; try{ unsub() }catch(_){}; if (!u) return resolve(null); try{ const tt = await u.getIdToken(); resolve(tt) }catch(e){ resolve(null) } })
     })
     if (tkn) return tkn
-    try{
-      const mod = await import('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js')
-      if (mod && typeof mod.signInAnonymously === 'function') {
-        await mod.signInAnonymously(auth)
-        const anon = auth.currentUser
-        if (anon) { const tt = await anon.getIdToken(); return tt }
-      }
-    }catch(_){ }
     return null
   }catch(e){ return null }
 }
@@ -35,16 +28,26 @@ function getGuestId(){
 function apiFetch(path, opts = {}){
   return (async ()=>{
     const token = await getOptionalToken();
-    const baseHeaders = { 'Content-Type': 'application/json', 'X-Guest-Id': getGuestId() }
+    const baseHeaders = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Guest-Id': getGuestId() }
     const headers = token ? Object.assign({}, opts.headers||{}, baseHeaders, { 'Authorization': 'Bearer ' + token }) : Object.assign({}, opts.headers||{}, baseHeaders)
-    const r = await fetch(`http://localhost:${Number(import.meta.env?.STORE_PORT||8090)}${path}`, { ...opts, headers })
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    return r.json()
+    const tryFetch = async (url) => {
+      const r = await fetch(url, { mode: 'cors', ...opts, headers })
+      if (!r.ok) throw new Error('HTTP ' + r.status)
+      const t = await r.text()
+      if (!t) throw new Error('empty')
+      return JSON.parse(t)
+    }
+    try {
+      return await tryFetch(path)
+    } catch (_e) {
+      const abs = `http://localhost:8093${path}`
+      return await tryFetch(abs)
+    }
   })()
 }
 
 async function loadSections(){
-  const res = await fetch(`http://localhost:${Number(import.meta.env?.STORE_PORT||8090)}/api/sections`)
+  const res = await fetch(`/api/sections`)
   const secs = await res.json()
   const root = document.getElementById('tienda-sections')
   root.innerHTML = ''
@@ -62,7 +65,7 @@ async function loadProducts(slug){
   const root = document.getElementById('tienda-products')
   root.innerHTML = ''
   try{
-    const res = await fetch(`http://localhost:${Number(import.meta.env?.STORE_PORT||8090)}/api/products?section=${encodeURIComponent(slug)}`)
+    const res = await fetch(`/api/products?section=${encodeURIComponent(slug)}`)
     if (!res.ok) throw new Error('HTTP ' + res.status)
     const prods = await res.json()
     if (!Array.isArray(prods) || prods.length === 0) {
@@ -76,11 +79,13 @@ async function loadProducts(slug){
       const card = document.createElement('div')
       card.className = 'border rounded p-3'
       const img = p.image ? `<img src="${p.image}" alt="${p.name}" class="w-full h-40 object-cover rounded mb-2" />` : ''
-      card.innerHTML = `${img}<div class="font-semibold">${p.name}</div><div class="text-sm text-gray-600">${p.description||''}</div><div class="mt-2">Precio: <strong>$${Number(p.price_base).toFixed(2)} USD</strong></div>`
+      const stockInfo = (typeof p.stock === 'number' && p.stock <= 0) ? '<div class="text-red-600 text-sm mt-1">Agotado</div>' : ''
+      card.innerHTML = `${img}<div class="font-semibold">${p.name}</div><div class="text-sm text-gray-600">${p.description||''}</div><div class="mt-2">Precio: <strong>$${Number(p.price_base).toFixed(2)} USD</strong></div>${stockInfo}`
       const btn = document.createElement('button')
-      btn.className = 'btn btn-primary mt-2'
-      btn.textContent = 'Agregar al carrito'
-      btn.addEventListener('click', ()=> addToCart(p.id, 1))
+      const disabled = (typeof p.stock === 'number' && p.stock <= 0)
+      btn.className = disabled ? 'btn btn-ghost mt-2 btn-disabled' : 'btn btn-primary mt-2'
+      btn.textContent = disabled ? 'No disponible' : 'Agregar al carrito'
+      if (!disabled) btn.addEventListener('click', ()=> addToCart(p.id, 1))
       card.appendChild(btn)
       root.appendChild(card)
     })
@@ -104,6 +109,8 @@ async function loadCart(){
     const data = await apiFetch('/api/cart', { method: 'GET' })
     const list = document.getElementById('tienda-cart-items')
     list.innerHTML = ''
+    const countEl = document.getElementById('tienda-cart-count')
+    if (countEl) countEl.textContent = String((Array.isArray(data.items)?data.items.length:0))
     data.items.forEach(it => {
       const row = document.createElement('div')
       row.className = 'flex items-center justify-between'
@@ -133,19 +140,13 @@ async function applyCoupon(){
   }catch(e){ document.getElementById('tienda-coupon-status').textContent = 'Cupón inválido'; }
 }
 
-async function checkout(){
-  try{
-    const data = await apiFetch('/api/checkout', { method: 'POST' })
-    const inv = document.getElementById('tienda-invoice')
-    const pdfUrl = `http://localhost:${Number(import.meta.env?.STORE_PORT||8090)}/api/invoices/${data.invoice_id}/pdf`
-    inv.innerHTML = `<div>Factura generada: N° ${data.invoice_number} — Control ${data.control_number}</div><div class="mt-2"><a class="underline" href="${pdfUrl}" target="_blank" rel="noopener">Imprimir PDF</a></div>`
-    await loadCart()
-  }catch(e){ alert('No se pudo finalizar: ' + (e.message||e)) }
-}
 
 function wire(){
   document.getElementById('tienda-apply-coupon')?.addEventListener('click', applyCoupon)
-  document.getElementById('tienda-checkout')?.addEventListener('click', checkout)
+  const goCheckout = document.getElementById('tienda-checkout')
+  if (goCheckout) {
+    goCheckout.addEventListener('click', ()=>{ window.location.href = '/src/pages/tienda/checkout.html' })
+  }
   const openBtn = document.getElementById('tienda-open-cart')
   const closeBtn = document.getElementById('tienda-close-cart')
   const overlay = document.getElementById('tienda-cart-modal-overlay')
@@ -156,6 +157,8 @@ function wire(){
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
+  const uid = await ensureAuthenticated()
+  if (!uid) { showLoginRequiredModal({ message: 'Debes iniciar sesión para acceder a la Tienda. Serás redirigido al login.' }); return }
   wire()
   await loadSections()
   await loadCart()

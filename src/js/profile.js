@@ -171,7 +171,7 @@ export function setupProfileActions() {
         const merged = await firebaseServices_ap.saveUserProfile_ap(user.uid, upd);
         profileStatus_ap.textContent = merged.profileComplete ? 'Perfil completo' : 'Perfil incompleto';
         profileStatus_ap.className = merged.profileComplete ? 'text-green-600' : 'text-yellow-600';
-        if (merged.carnetURL) profileCarnetPreview_ap.innerHTML = `<img src="${escapeHTML(merged.carnetURL)}" alt="carnet" class="w-32 h-auto rounded">`;
+        if (merged.carnetURL && profileCarnetPreview_ap) { profileCarnetPreview_ap.innerHTML = `<img src="${escapeHTML(merged.carnetURL)}" alt="carnet" class="w-32 h-auto rounded">`; }
         alert('Perfil guardado');
       } catch (err) {
         console.error('Error guardando perfil', err);

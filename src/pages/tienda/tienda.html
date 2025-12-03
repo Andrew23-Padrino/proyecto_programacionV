@@ -14,37 +14,83 @@
         <section class="lg:col-span-3 bg-white rounded-lg shadow-md p-6">
           <h2 class="text-2xl font-bold text-primary mb-4">Tienda</h2>
           <div class="flex items-center justify-between mb-4">
-            <p class="text-gray-700">Compra materiales educativos por secciones. Requiere iniciar sesión.</p>
-            <button id="tienda-open-cart" class="btn btn-secondary">Carrito</button>
+            <p class="text-gray-700">
+              Compra materiales educativos por secciones. Requiere iniciar
+              sesión.
+            </p>
+            <button id="tienda-open-cart" class="btn btn-secondary btn-lg">
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M7 4h-2a1 1 0 100 2h2l1.2 7.2a2 2 0 002 1.8h7.6a1 1 0 000-2H10.5l-.3-2h8.3a1 1 0 00.97-.76l1.2-4.5A1 1 0 0019.7 4H8.1L7.8 2.8A2 2 0 006 2H4a1 1 0 100 2h2l1 6h9.5"
+                />
+                <circle cx="9" cy="20" r="1.5" />
+                <circle cx="17" cy="20" r="1.5" />
+              </svg>
+              Carrito <span id="tienda-cart-count" class="badge">0</span>
+            </button>
           </div>
           <div>
             <h3 class="text-lg font-semibold mb-2">Secciones</h3>
-            <div id="tienda-sections" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+            <div
+              id="tienda-sections"
+              class="grid grid-cols-2 md:grid-cols-3 gap-3"
+            ></div>
           </div>
           <div class="mt-6">
             <h3 class="text-lg font-semibold mb-2">Productos</h3>
-            <div id="tienda-products" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            <div
+              id="tienda-products"
+              class="grid grid-cols-1 md:grid-cols-2 gap-4"
+            ></div>
           </div>
         </section>
       </div>
     </main>
-    <div id="tienda-cart-modal-overlay" class="fixed inset-0 bg-black/50 hidden z-40"></div>
-    <div id="tienda-cart-modal" class="fixed inset-0 hidden z-50 flex items-center justify-center">
+    <div
+      id="tienda-cart-modal-overlay"
+      class="fixed inset-0 bg-black/50 hidden z-40"
+    ></div>
+    <div
+      id="tienda-cart-modal"
+      class="fixed inset-0 hidden z-50 flex items-center justify-center"
+    >
       <div class="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative">
-        <button id="tienda-close-cart" class="absolute top-3 right-3 btn btn-ghost">Cerrar</button>
+        <button
+          id="tienda-close-cart"
+          class="absolute top-3 right-3 btn btn-ghost"
+        >
+          Cerrar
+        </button>
         <h3 class="text-lg font-semibold">Carrito</h3>
         <div id="tienda-cart-items" class="mt-3 space-y-2"></div>
         <div class="mt-4">
           <label class="block text-sm text-gray-700">Cupón</label>
           <div class="flex gap-2 mt-1">
-            <input id="tienda-coupon" type="text" class="form-input px-3 py-2 rounded w-full" placeholder="Código de cupón" />
-            <button id="tienda-apply-coupon" class="btn btn-outline">Aplicar</button>
+            <input
+              id="tienda-coupon"
+              type="text"
+              class="form-input px-3 py-2 rounded w-full"
+              placeholder="Código de cupón"
+            />
+            <button id="tienda-apply-coupon" class="btn btn-outline">
+              Aplicar
+            </button>
           </div>
-          <div id="tienda-coupon-status" class="text-xs text-gray-600 mt-1"></div>
+          <div
+            id="tienda-coupon-status"
+            class="text-xs text-gray-600 mt-1"
+          ></div>
         </div>
         <div class="mt-4 text-sm text-gray-700" id="tienda-totals"></div>
         <div class="mt-4 flex gap-2">
-          <button id="tienda-checkout" class="btn btn-primary w-full">Pagar y generar factura</button>
+          <button id="tienda-checkout" class="btn btn-primary w-full">
+            Pagar y generar factura
+          </button>
         </div>
         <div id="tienda-invoice" class="mt-4 text-sm text-gray-700"></div>
       </div>
