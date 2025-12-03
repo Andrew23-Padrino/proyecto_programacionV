@@ -47,8 +47,7 @@ function apiFetch(path, opts = {}){
 }
 
 async function loadSections(){
-  const res = await fetch(`/api/sections`)
-  const secs = await res.json()
+  const secs = await apiFetch('/api/sections', { method: 'GET' })
   const root = document.getElementById('tienda-sections')
   root.innerHTML = ''
   secs.forEach(s => {
@@ -65,9 +64,7 @@ async function loadProducts(slug){
   const root = document.getElementById('tienda-products')
   root.innerHTML = ''
   try{
-    const res = await fetch(`/api/products?section=${encodeURIComponent(slug)}`)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    const prods = await res.json()
+    const prods = await apiFetch(`/api/products?section=${encodeURIComponent(slug)}`, { method: 'GET' })
     if (!Array.isArray(prods) || prods.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'text-gray-600'
