@@ -47,7 +47,11 @@ function apiFetch(path, opts = {}){
 }
 
 async function loadSections(){
+<<<<<<< HEAD
   const secs = await apiFetch('/api/sections', { method: 'GET' })
+=======
+  const secs = await apiFetch('/api/sections')
+>>>>>>> cb711b0dc66793c9e86687fc82d832686f571733
   const root = document.getElementById('tienda-sections')
   root.innerHTML = ''
   secs.forEach(s => {
@@ -64,7 +68,11 @@ async function loadProducts(slug){
   const root = document.getElementById('tienda-products')
   root.innerHTML = ''
   try{
+<<<<<<< HEAD
     const prods = await apiFetch(`/api/products?section=${encodeURIComponent(slug)}`, { method: 'GET' })
+=======
+    const prods = await apiFetch(`/api/products?section=${encodeURIComponent(slug)}`)
+>>>>>>> cb711b0dc66793c9e86687fc82d832686f571733
     if (!Array.isArray(prods) || prods.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'text-gray-600'
@@ -154,8 +162,8 @@ function wire(){
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
-  const uid = await ensureAuthenticated()
-  if (!uid) { showLoginRequiredModal({ message: 'Debes iniciar sesión para acceder a la Tienda. Serás redirigido al login.' }); return }
+  // Allow browsing the store without forcing login. Checkout page still requires auth.
+  try{ await ensureAuthenticated() }catch(_e){}
   wire()
   await loadSections()
   await loadCart()

@@ -8,6 +8,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8093',
         changeOrigin: true,
+        headers: { origin: 'http://localhost:5173' },
       },
     },
   },

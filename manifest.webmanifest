@@ -1,0 +1,23 @@
+{
+  "name": "NovaCiencia academy",
+  "short_name": "NovaCiencia",
+  "description": "Juegos educativos y recursos para aprender ciencias naturales.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1E6F5C",
+  "icons": [
+    {
+      "src": "/img/NovaCiencia/Logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/img/NovaCiencia/Logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
