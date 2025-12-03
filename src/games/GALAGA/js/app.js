@@ -208,16 +208,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     //alien.imagen.addEventListener('load', ()=> alien.setImagenCargada(true));
     //explosion.imagen.addEventListener('load', ()=> explosion.setImagenCargada(true));
 
-    document.addEventListener('keydown', (e) => {
-        //console.log(e);
-        nave.mover(e.keyCode, 0, canvas.width);
-    })
+    // Use capture on window to intercept key events before browser default handlers
+    const keyDownHandler = (e) => {
+        try{
+            const keyIsSpace = e.key === ' ' || e.code === 'Space' || e.keyCode === 32;
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+            const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable);
+            if (keyIsSpace && !isEditable) {
+                e.preventDefault();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            }
+        }catch(_){ }
+        // mover la nave con las teclas
+        try{ nave.mover(e.keyCode || 0, 0, canvas.width); }catch(_){ }
+    };
 
-    document.addEventListener('keyup', (e) => {
-        if (e.keyCode == 32) {
-            nave.disparar(e.keyCode);
+    const keyUpHandler = (e) => {
+        try{
+            const keyIsSpace = e.key === ' ' || e.code === 'Space' || e.keyCode === 32;
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+            const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable);
+            if (keyIsSpace && !isEditable) {
+                e.preventDefault();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                try{ nave.disparar(e.keyCode || 32); }catch(_){ }
+            }
+        }catch(_){
+            try{ if (e.keyCode == 32) { e.preventDefault(); nave.disparar(e.keyCode); } }catch(_){ }
         }
-    })
+    };
+
+    window.addEventListener('keydown', keyDownHandler, { capture: true });
+    window.addEventListener('keyup', keyUpHandler, { capture: true });
     let respuesta = await UI.mostrarConfirmacion('info', `¡Bienvenido ${usuario_SM.data.nombreUsuario}!`, 'Haz click en ACEPTAR para empezar a jugar');
     if (!respuesta.isConfirmed) {
         Sesion.cerrarSesion();

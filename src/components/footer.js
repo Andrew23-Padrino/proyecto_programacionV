@@ -60,10 +60,57 @@ export function mountFooter(container) {
         </div>
         <div class="nc-bottom">
           <p>&copy; 2023 NovaCiencia academy - Universidad Nueva Esparta. Todos los derechos reservados.</p>
+          <div style="margin-top:8px;">
+            <button id="pwa-install-btn-footer" aria-hidden="false" style="display:inline-block; background:#fff;color:#1E6F5C;border-radius:6px;padding:8px 10px;border:none;font-weight:600;">Instalar App</button>
+          </div>
         </div>
       </div>
     </footer>
   `
+
+  // PWA install prompt handling (attach listeners after element insertion)
+  try{
+    const installBtn = container.querySelector('#pwa-install-btn-footer');
+    let deferredPrompt = window.deferredPrompt || null;
+
+    // If a global beforeinstallprompt was captured earlier, show the button
+    if (deferredPrompt && installBtn) {
+      installBtn.style.display = 'inline-block';
+      installBtn.setAttribute('aria-hidden','false');
+    }
+
+    // Listen for a custom event in case the prompt fired before mountFooter
+    window.addEventListener('nc-beforeinstallprompt', (ev) => {
+      try{ deferredPrompt = ev.detail; if (installBtn) { installBtn.style.display = 'inline-block'; installBtn.setAttribute('aria-hidden','false'); } }catch(_){ }
+    });
+
+    // normal beforeinstallprompt listener (works if event fires after mount)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      try{ e.preventDefault(); deferredPrompt = e; if (installBtn) { installBtn.style.display = 'inline-block'; installBtn.setAttribute('aria-hidden','false'); } }catch(_){ }
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        try{
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const choice = await deferredPrompt.userChoice;
+            if (choice && choice.outcome === 'accepted') console.log('User accepted the install prompt');
+            deferredPrompt = null;
+            installBtn.style.display = 'none';
+            installBtn.setAttribute('aria-hidden','true');
+            return;
+          }
+        }catch(_){ }
+        // fallback: instruct user how to install manually
+        try{
+          alert('Para instalar la app: abre el menú del navegador y selecciona "Instalar" o "Add to Home screen". En iOS usa Compartir → "Add to Home Screen".');
+        }catch(_){ }
+      });
+    }
+
+    window.addEventListener('appinstalled', ()=>{ try{ const b = container.querySelector('#pwa-install-btn-footer'); if (b) b.style.display='none'; }catch(_){} });
+  }catch(_){ }
 }
 
 export function unmountFooter(container) {
